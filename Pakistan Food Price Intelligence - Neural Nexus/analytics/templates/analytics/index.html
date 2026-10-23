@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pakistan Food Price Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#111827;--mut:#6b7280;--bd:#e5e7eb;--ac:#2563eb;--grid:rgba(120,120,120,.2)}
+@media(prefers-color-scheme:dark){:root{--bg:#0b0f17;--card:#131a26;--fg:#e5e7eb;--mut:#94a3b8;--bd:#243044}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 48px}h1{margin:0;font-size:28px}h2{margin:0;font-size:18px}
+.muted{color:var(--mut);font-size:13px;margin:4px 0 8px}.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:18px;margin-top:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}.chart{position:relative;height:340px}.chart.small{height:280px}
+select,input{background:var(--bg);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:8px 10px;font:inherit}
+button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:8px;padding:7px 12px}
+button:disabled{opacity:.5;cursor:not-allowed}.primary{background:var(--ac);border-color:var(--ac);color:#fff}
+.seg button{border-radius:0}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0}.seg .on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}th,td{padding:7px 10px;border-bottom:1px solid var(--bd);text-align:left}tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.chips button{font-size:13px;text-align:left}
+.thread{display:flex;flex-direction:column;gap:10px;margin:12px 0}.msg{padding:10px 14px;border-radius:12px;border:1px solid var(--bd)}.msg.user{background:var(--ac);color:#fff;align-self:flex-end;max-width:85%}
+.msg p{margin:6px 0}.msg h3,.msg h4{font-size:16px;margin:12px 0 4px}.msg ul{margin:6px 0;padding-left:20px}.msg pre{font-size:12px;overflow:auto;max-height:240px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}.kpi{border:1px solid var(--bd);border-radius:10px;padding:10px}.kpi small{color:var(--mut)}.kpi b{display:block;font-size:20px}.warn{color:#b45309;font-size:13px;margin:2px 0}.up{color:#dc2626}.down{color:#16a34a}
+.ask{display:flex;gap:8px}.ask input{flex:1}#code{margin-bottom:8px;width:100%;display:none}footer{margin-top:24px;text-align:center}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Pakistan Food Price Intelligence</h1>
+    <p class="muted" id="sub"></p>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <h2>Price trend</h2>
+      <select id="commodity"></select>
+      <div class="seg"><button id="m-price" class="on">PKR</button><button id="m-usd">USD</button></div>
+    </div>
+    <p class="muted" id="trend-sub"></p>
+    <div class="chart"><canvas id="trend"></canvas></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card"><h2 id="city-title">City comparison</h2><p class="muted" id="city-sub"></p><div class="chart small"><canvas id="city"></canvas></div></section>
+    <section class="card"><h2>Average annual growth</h2><p class="muted">CAGR % in PKR, first to last year of each item</p><div class="chart small"><canvas id="growth"></canvas></div></section>
+  </div>
+
+  <section class="card">
+    <h2>Commodity scorecard</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Commodity</th><th>Unit</th><th>Period</th><th>First avg</th><th>Last avg</th><th>× PKR</th><th>× USD</th><th>CAGR</th><th>Last YoY</th><th>Volatility*</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <p class="muted">*Std. dev. of month-over-month % change. Click a row to chart it.</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2>Price forecast</h2>
+      <div class="row" style="gap:8px"><select id="f-market"></select><select id="f-h"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option><option value="24">24 months</option></select></div>
+    </div>
+    <p class="muted" id="f-sub">Statistical forecast for the item selected above (history · forecast · 80% range).</p>
+    <div class="kpis" id="f-kpis"></div>
+    <div class="chart"><canvas id="fchart"></canvas></div>
+    <div id="f-warn"></div>
+    <div class="row" style="margin-top:12px"><h2 style="font-size:16px">Outlook for all items</h2><button id="f-all">Compare all items</button></div>
+    <div class="scroll" id="f-table"></div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>AI analyst (Gemini)</h2><button class="primary" id="report">Generate full report</button></div>
+    <p class="muted">Ask anything about the dataset. The AI queries the data itself and shows which queries it ran.</p>
+    <div class="chips" id="chips"></div>
+    <div class="thread" id="thread"></div>
+    <input id="code" type="password" placeholder="Access code">
+    <form class="ask" id="form"><input id="q" placeholder="e.g. Is sugar more expensive in Quetta than Lahore?" maxlength="500"><button class="primary" id="ask">Ask</button></form>
+  </section>
+  <footer class="muted">Data: WFP / HDX. AI answers may contain errors — verify important figures.</footer>
+</main>
+
+{{ data|json_script:"data" }}
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const $ = (id) => document.getElementById(id);
+const COLORS = ["#2563eb", "#16a34a", "#d97706", "#db2777", "#7c3aed"];
+const SUGGESTED = [
+  "Which food items became most expensive since 2013 and why might that be?",
+  "Compare wheat flour prices across the five cities in 2023.",
+  "How did prices behave in 2022-2023 versus earlier years?",
+  "Which commodities are the most volatile month to month?",
+  "Forecast wheat flour prices for the next 12 months and explain the uncertainty.",
+  "Which items are expected to rise the most over the next 6 months?"];
+const REPORT = "Write an executive report on food price trends in Pakistan from this dataset. Cover inflation, PKR vs USD, regional differences, volatility and recommendations for a household budget planner.";
+let commodity = "Wheat flour", metric = "price", charts = {}, msgs = [], loading = false;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cookie = (n) => (document.cookie.split("; ").find((c) => c.startsWith(n + "=")) || "").split("=")[1] || "";
+
+$("sub").textContent = `WFP retail prices · ${D.from.slice(0,4)}–${D.to.slice(0,4)} · ${D.records.toLocaleString()} records · ${D.commodities.length} commodities · ${D.markets.length} cities`;
+$("commodity").innerHTML = D.commodities.map((c) => `<option ${c===commodity?"selected":""}>${esc(c)}</option>`).join("");
+$("tbody").innerHTML = D.stats.map((s) => `<tr data-c="${esc(s.commodity)}"><td>${esc(s.commodity)}</td><td>${s.unit}</td><td>${s.first_year}–${s.last_year}</td><td>${s.first_avg_pkr}</td><td>${s.last_avg_pkr}</td><td>${s.multiple}</td><td>${s.usd_multiple}</td><td>${s.cagr_pct}%</td><td>${s.yoy_last_pct ?? "–"}%</td><td>${s.monthly_volatility_pct ?? "–"}%</td></tr>`).join("");
+$("chips").innerHTML = SUGGESTED.map((q) => `<button type="button">${esc(q)}</button>`).join("");
+
+function draw(id, cfg) { charts[id]?.destroy(); charts[id] = new Chart($(id), cfg); }
+const opts = (extra = {}) => ({ responsive: true, maintainAspectRatio: false, ...extra });
+
+function render() {
+  const series = D.yearly[commodity][metric], latest = D.latest[commodity], cur = metric === "price" ? "PKR" : "USD";
+  $("trend-sub").textContent = `Yearly average ${cur} per ${latest.unit}, nominal`;
+  $("m-price").className = metric === "price" ? "on" : ""; $("m-usd").className = metric === "usd" ? "on" : "";
+  const ds = [{ label: "National", data: series.map((r) => r.National), borderColor: "#6b7280", borderWidth: 3, pointRadius: 0 }]
+    .concat(D.markets.map((m, i) => ({ label: m, data: series.map((r) => r[m] ?? null), borderColor: COLORS[i], borderWidth: 2, pointRadius: 0, spanGaps: true })));
+  draw("trend", { type: "line", data: { labels: series.map((r) => r.year), datasets: ds }, options: opts({ interaction: { mode: "index", intersect: false } }) });
+  $("city-title").textContent = `City comparison · ${latest.year}`;
+  $("city-sub").textContent = `Average ${cur} per ${latest.unit} for ${commodity}`;
+  draw("city", { type: "bar", data: { labels: latest.items.map((i) => i.market), datasets: [{ label: cur, data: latest.items.map((i) => i[metric]), backgroundColor: "#2563eb", borderRadius: 4 }] }, options: opts({ plugins: { legend: { display: false } } }) });
+  loadForecast();
+}
+const g = D.stats.filter((s) => s.cagr_pct).sort((a, b) => b.cagr_pct - a.cagr_pct);
+draw("growth", { type: "bar", data: { labels: g.map((s) => s.commodity.replace(/ \(.*\)/, "")), datasets: [{ label: "CAGR %", data: g.map((s) => s.cagr_pct), backgroundColor: "#d97706", borderRadius: 4 }] }, options: opts({ indexAxis: "y", plugins: { legend: { display: false } } }) });
+render();
+
+$("commodity").onchange = (e) => { commodity = e.target.value; render(); };
+$("m-price").onclick = () => { metric = "price"; render(); };
+$("m-usd").onclick = () => { metric = "usd"; render(); };
+$("tbody").onclick = (e) => { const tr = e.target.closest("tr"); if (!tr) return; commodity = tr.dataset.c; $("commodity").value = commodity; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
+
+/* ---------- forecast ---------- */
+$("f-market").innerHTML = '<option value="">National average</option>' + D.markets.map((m) => `<option>${esc(m)}</option>`).join("");
+let fTok = 0;
+const fmt = (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+async function loadForecast() {
+  const tok = ++fTok, h = $("f-h").value;
+  const qs = new URLSearchParams({ commodity, horizon: h, metric, market: $("f-market").value });
+  $("f-kpis").innerHTML = '<span class="muted">Forecasting…</span>';
+  let f; try { f = await (await fetch("/api/forecast/?" + qs)).json(); } catch { f = { error: "Network error" }; }
+  if (tok !== fTok) return;
+  if (f.error) { $("f-kpis").innerHTML = ""; $("f-warn").innerHTML = `<p class="warn">⚠️ ${esc(f.error)}</p>`; charts.fchart?.destroy(); return; }
+  const cur = metric === "price" ? "PKR" : "USD", last = f.forecast[f.forecast.length - 1], hist = f.history, nh = hist.length;
+  const labels = hist.map((r) => r.month).concat(f.forecast.map((r) => r.month));
+  const pad = (arr, join) => Array(nh - 1).fill(null).concat([join], arr);
+  const lv = hist[nh - 1].value;
+  const ds = [
+    { label: "History", data: hist.map((r) => r.value).concat(Array(f.forecast.length).fill(null)), borderColor: "#6b7280", borderWidth: 2, pointRadius: 0 },
+    { label: "_low", data: pad(f.forecast.map((r) => r.low80), lv), borderWidth: 0, pointRadius: 0, fill: false },
+    { label: "80% range", data: pad(f.forecast.map((r) => r.high80), lv), borderWidth: 0, pointRadius: 0, backgroundColor: "rgba(37,99,235,.18)", fill: "-1" },
+    { label: "Forecast", data: pad(f.forecast.map((r) => r.point), lv), borderColor: "#2563eb", borderDash: [6, 4], borderWidth: 3, pointRadius: 0 }];
+  draw("fchart", { type: "line", data: { labels, datasets: ds }, options: opts({ interaction: { mode: "index", intersect: false },
+    plugins: { legend: { labels: { filter: (i) => !i.text.startsWith("_") } }, tooltip: { filter: (i) => !i.dataset.label.startsWith("_") } },
+    scales: { x: { ticks: { maxTicksLimit: 12 } } } }) });
+  const b = f.backtest, cls = f.change_pct_at_end >= 0 ? "up" : "down";
+  $("f-sub").textContent = `${f.commodity} · ${f.scope} · ${cur} per ${f.unit} · last data ${f.last_observed} · model: ${f.method}`;
+  $("f-kpis").innerHTML = `
+    <div class="kpi"><small>Last observed (${f.last_observed})</small><b>${fmt(f.last_value)}</b></div>
+    <div class="kpi"><small>Forecast ${last.month}</small><b>${fmt(last.point)}</b><small>80%: ${fmt(last.low80)} – ${fmt(last.high80)}</small></div>
+    <div class="kpi"><small>Expected change</small><b class="${cls}">${f.change_pct_at_end > 0 ? "+" : ""}${f.change_pct_at_end}%</b></div>
+    <div class="kpi"><small>Backtest error (${b.horizon_months}-mo, ${b.origins} tests)</small><b>${b.chosen_mape_pct ?? "–"}%</b><small>naive baseline: ${b.naive_mape_pct ?? "–"}%</small></div>`;
+  $("f-warn").innerHTML = f.warnings.map((w) => `<p class="warn">⚠️ ${esc(w)}</p>`).join("");
+}
+$("f-h").onchange = loadForecast; $("f-market").onchange = loadForecast;
+$("f-all").onclick = async () => {
+  $("f-table").innerHTML = '<p class="muted">Forecasting all items…</p>';
+  const j = await (await fetch(`/api/outlook/?horizon=${$("f-h").value}&metric=${metric}`)).json();
+  $("f-table").innerHTML = `<table><thead><tr><th>Commodity</th><th>Unit</th><th>Last (month)</th><th>Forecast (month)</th><th>80% range</th><th>Change</th><th>Backtest err.</th></tr></thead><tbody>` +
+    j.rows.map((r) => `<tr data-c="${esc(r.commodity)}"><td>${esc(r.commodity)}${r.stale ? " ⚠️ stale" : ""}</td><td>${r.unit}</td><td>${fmt(r.last_value)} (${r.last_observed})</td><td>${fmt(r.forecast)} (${r.forecast_month})</td><td>${fmt(r.low80)} – ${fmt(r.high80)}</td><td class="${r.change_pct >= 0 ? "up" : "down"}">${r.change_pct > 0 ? "+" : ""}${r.change_pct}%</td><td>${r.backtest_mape_pct ?? "–"}%</td></tr>`).join("") + "</tbody></table>";
+};
+$("f-table").onclick = (e) => { const tr = e.target.closest("tr[data-c]"); if (tr) { commodity = tr.dataset.c; $("commodity").value = commodity; render(); } };
+
+/* minimal safe markdown: escape first, then format */
+function md(t) {
+  const lines = esc(t).split("\n"); let html = "", list = false;
+  const inline = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`(.+?)`/g, "<code>$1</code>");
+  for (const l of lines) {
+    const b = l.match(/^\s*[-*]\s+(.*)/), h = l.match(/^#{1,4}\s+(.*)/);
+    if (b) { if (!list) { html += "<ul>"; list = true; } html += `<li>${inline(b[1])}</li>`; continue; }
+    if (list) { html += "</ul>"; list = false; }
+    if (h) html += `<h3>${inline(h[1])}</h3>`; else if (l.trim()) html += `<p>${inline(l)}</p>`;
+  }
+  return html + (list ? "</ul>" : "");
+}
+function paint() {
+  $("thread").innerHTML = msgs.map((m) => `<div class="msg ${m.role}">${m.role === "assistant" ? md(m.content) : `<p>${esc(m.content)}</p>`}${m.calls?.length ? `<details><summary>${m.calls.length} analysis steps used (data + forecast)</summary><pre>${esc(JSON.stringify(m.calls, null, 1))}</pre></details>` : ""}</div>`).join("") + (loading ? '<div class="msg assistant muted">Analysing data…</div>' : "");
+  $("ask").disabled = $("report").disabled = loading;
+}
+async function ask(q) {
+  q = q.trim(); if (!q || loading) return;
+  msgs.push({ role: "user", content: q }); $("q").value = ""; loading = true; paint();
+  try {
+    const r = await fetch("/api/analyze/", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": cookie("csrftoken"), "x-access-code": $("code").value },
+      body: JSON.stringify({ messages: msgs.map(({ role, content }) => ({ role, content })) }) });
+    const j = await r.json();
+    if (r.status === 401) $("code").style.display = "block";
+    msgs.push({ role: "assistant", content: r.ok ? j.answer : "⚠️ " + (j.error || "Request failed"), calls: j.calls });
+  } catch { msgs.push({ role: "assistant", content: "⚠️ Network error. Please try again." }); }
+  loading = false; paint();
+}
+$("form").onsubmit = (e) => { e.preventDefault(); ask($("q").value); };
+$("report").onclick = () => ask(REPORT);
+$("chips").onclick = (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); };
+</script>
+</body>
+</html>
